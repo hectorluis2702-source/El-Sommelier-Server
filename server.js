@@ -3,6 +3,21 @@ const cors = require('cors');
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
+const REQUIRED_ENV_VARS = [
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+  'AZURE_OPENAI_ENDPOINT',
+  'AZURE_OPENAI_DEPLOYMENT',
+  'AZURE_OPENAI_KEY'
+];
+
+const missingEnvVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
+if (missingEnvVars.length > 0) {
+  console.error(`Faltan variables de entorno: ${missingEnvVars.join(', ')}`);
+  console.error('Copia .env.example a .env y complétalo antes de arrancar el servidor.');
+  process.exit(1);
+}
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
@@ -33,6 +48,10 @@ Siempre terminas tus respuestas con una nota poética o filosófica sobre el vin
 app.post('/api/sommelier', async (req, res) => {
   try {
     const { message, context } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'El campo "message" es requerido y debe ser texto' });
+    }
 
     const response = await fetch(
       `${process.env.AZURE_OPENAI_ENDPOINT}openai/deployments/${process.env.AZURE_OPENAI_DEPLOYMENT}/chat/completions?api-version=2024-12-01-preview`,
@@ -71,6 +90,11 @@ app.get('/api/health', (req, res) => res.json({ status: 'El Maestro está en lí
 app.post('/api/guardar-consulta', async (req, res) => {
   try {
     const { usuario, pregunta, respuesta } = req.body;
+
+    if (!usuario || !pregunta || !respuesta) {
+      return res.status(400).json({ error: 'Los campos "usuario", "pregunta" y "respuesta" son requeridos' });
+    }
+
     const { data, error } = await supabase
       .from('consultas_sommelier')
       .insert([{ usuario, pregunta, respuesta }]);
@@ -94,6 +118,7 @@ app.get('/api/vinos', async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`Sommelier IA corriendo en puerto ${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Sommelier IA corriendo en puerto ${PORT}`);
 });
